@@ -1,0 +1,87 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write # for AWS OIDC in the deploy job
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: aegis_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 3s --health-retries 20
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests && ruff format --check app tests
+      - name: Tests on SQLite
+        run: pytest -q
+      - name: Tests on PostgreSQL with pgvector
+        run: pytest -q
+        env: { AEGIS_TEST_DATABASE_URL: "postgresql+psycopg://postgres:postgres@localhost:5432/aegis_test" }
+
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run build
+
+  infra:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: infra/terraform } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false && terraform validate
+
+  deploy:
+    # Set repository variables AWS_DEPLOY_ROLE_ARN, AWS_REGION, TF_STATE_BUCKET, TF_LOCK_TABLE and
+    # COGNITO_DOMAIN_PREFIX (and optionally DEMO_REVIEWER_EMAIL) to turn this on.
+    if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    needs: [api, web, infra]
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      TF_VAR_environment: dev
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_cognito_domain_prefix: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+      TF_VAR_demo_reviewer_email: ${{ vars.DEMO_REVIEWER_EMAIL || 'priya.nair@northwindpay.example' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_wrapper: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Terraform init
+        run: >
+          terraform -chdir=infra/terraform init -input=false
+          -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          -backend-config="key=aegis/dev/terraform.tfstate"
+          -backend-config="region=${{ vars.AWS_REGION }}"
+          -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
+          -backend-config="encrypt=true"
+      - name: Deploy
+        run: ./scripts/deploy.sh
+        env:
+          ENVIRONMENT: dev
+          IMAGE_TAG: ${{ github.sha }}

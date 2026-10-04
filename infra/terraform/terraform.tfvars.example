@@ -1,0 +1,6 @@
+region                = "us-east-1"
+environment           = "dev"
+cognito_domain_prefix = "aegis-dev-yourfirm" # must be globally unique
+seed_demo_data        = true
+deletion_protection   = false # keep true for anything holding real data
+# bedrock_chat_model_id = "<Bedrock model or inference profile ID enabled in your account>"

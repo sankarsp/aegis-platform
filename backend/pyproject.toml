@@ -1,0 +1,15 @@
+[project]
+name = "aegis-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008"]  # FastAPI's Depends() in defaults is intended
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
