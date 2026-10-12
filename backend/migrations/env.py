@@ -23,6 +23,12 @@ from app.db import Base  # noqa: E402
 config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """knowledge_vectors is managed by raw SQL (pgvector), not the ORM; never autogenerate a drop for it."""
+    return not (type_ == "table" and name == "knowledge_vectors") and not (type_ == "index" and name == "knowledge_vectors_hnsw")
+
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -65,7 +71,7 @@ def run_migrations_online() -> None:
             connection.execute(text("SELECT pg_advisory_lock(7299)"))
             connection.commit()
         try:
-            context.configure(connection=connection, target_metadata=target_metadata)
+            context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
             with context.begin_transaction():
                 context.run_migrations()
             connection.commit()

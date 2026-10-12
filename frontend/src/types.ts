@@ -72,3 +72,24 @@ export interface AiModel {
 
 export interface SearchHit { kind: string; refId: string; title: string; body: string; score: number }
 export interface AskResult { question: string; answer: string | null; sources: SearchHit[] }
+
+export interface RailMetrics {
+  volume30d: number; value30dUsd: number; screeningPct: number; travelRulePct: number | null;
+  returnRate: { label: string; value: number; threshold: number; unit: string };
+}
+export interface RailSummary {
+  id: string; name: string; category: string; region: string; operator: string; messageStandard: string;
+  settlement: string; availability: string; limit: string; routesTo: string[]; metrics: RailMetrics;
+  quality: Status; rateOver: boolean; alerts: ModelAlert[]; upcomingChanges: number;
+}
+export interface RailDetail extends RailSummary {
+  description: string;
+  regulations: { name: string; note: string }[];
+  changes: { date: string; text: string }[];
+  controls: string[];
+  cdes: Cde[];
+  rules: Rule[];
+  issues: Issue[];
+  models: { id: string; name: string; version: string; tier: string; stage: string; alerts: ModelAlert[] }[];
+  report: { id: string; name: string; gate: Gate; completeness: number } | null;
+}

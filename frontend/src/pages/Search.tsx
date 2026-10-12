@@ -4,17 +4,18 @@ import { api } from "../api";
 import { PageHead, Pill, useAction } from "../components/ui";
 import type { AskResult } from "../types";
 
-const KIND_LABEL: Record<string, string> = { dataset: "Dataset", cde: "CDE", term: "Glossary term", policy: "Policy", model: "AI model", report: "Report" };
+const KIND_LABEL: Record<string, string> = { dataset: "Dataset", cde: "CDE", term: "Glossary term", policy: "Policy", model: "AI model", report: "Report", rail: "Payment rail" };
 
 function linkFor(kind: string, refId: string, title: string) {
   if (kind === "report") return `/lineage/${refId}`;
   if (kind === "model") return `/ai/${refId}`;
+  if (kind === "rail") return `/payments/${refId}`;
   if (kind === "policy") return "/access";
   if (kind === "term") return "/catalog";
   return `/catalog?q=${encodeURIComponent(kind === "cde" ? refId : title)}`;
 }
 
-const EXAMPLES = ["Which models make credit decisions and how are they tested for fairness?", "Where does customer personal data live?", "What feeds the sponsor bank reconciliation?"];
+const EXAMPLES = ["Which models make credit decisions and how are they tested for fairness?", "Where does customer personal data live?", "What feeds the sponsor bank reconciliation?", "Which payment rails changed rules in 2025 or 2026?"];
 
 export default function Search() {
   const [question, setQuestion] = useState("");

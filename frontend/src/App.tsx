@@ -8,6 +8,7 @@ import Audit from "./pages/Audit";
 import Catalog from "./pages/Catalog";
 import Lineage from "./pages/Lineage";
 import OverviewPage from "./pages/Overview";
+import Payments from "./pages/Payments";
 import Quality from "./pages/Quality";
 import Recert from "./pages/Recert";
 import Search from "./pages/Search";
@@ -15,6 +16,7 @@ import Search from "./pages/Search";
 const NAV: { to: string; label: string; group: string; badge?: "issues" | "reviews" | "models" }[] = [
   { to: "/", label: "Overview", group: "Console" },
   { to: "/search", label: "Ask Aegis", group: "Console" },
+  { to: "/payments", label: "Payment rails", group: "Console" },
   { to: "/lineage", label: "Lineage", group: "Pillars" },
   { to: "/quality", label: "Data quality", group: "Pillars", badge: "issues" },
   { to: "/catalog", label: "Catalog", group: "Pillars" },
@@ -63,6 +65,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<OverviewPage />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/payments/:railId" element={<Payments />} />
           <Route path="/lineage" element={<Lineage />} />
           <Route path="/lineage/:reportId" element={<Lineage />} />
           <Route path="/quality" element={<Quality />} />

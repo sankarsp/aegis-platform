@@ -199,3 +199,27 @@ class AuditEvent(Base):
     object: Mapped[str] = mapped_column(String(300))
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
+
+
+class PaymentRail(Base):
+    """A payment type the fintech offers (ACH, wires, real-time rails, cross-border), with its rules and metrics."""
+
+    __tablename__ = "payment_rails"
+    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    category: Mapped[str] = mapped_column(String(40))  # Batch | Real-time | High-value RTGS | Cross-border | Product
+    operator: Mapped[str] = mapped_column(String(160))
+    region: Mapped[str] = mapped_column(String(40))
+    description: Mapped[str] = mapped_column(Text)
+    message_standard: Mapped[str] = mapped_column(String(200))
+    settlement: Mapped[str] = mapped_column(String(200))
+    availability: Mapped[str] = mapped_column(String(120))
+    txn_limit: Mapped[str] = mapped_column(String(160))
+    routes_to: Mapped[list] = mapped_column(JSON)
+    regulations: Mapped[list] = mapped_column(JSON)  # [{name, note}]
+    changes: Mapped[list] = mapped_column(JSON)  # [{date, text}] rule and standard changes, past and upcoming
+    cde_ids: Mapped[list] = mapped_column(JSON)
+    model_ids: Mapped[list] = mapped_column(JSON)
+    report_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    metrics: Mapped[dict] = mapped_column(JSON)
+    controls: Mapped[list] = mapped_column(JSON)

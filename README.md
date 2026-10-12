@@ -1,8 +1,9 @@
 # Aegis: data and AI governance for fintechs
 
 Aegis is one control plane for a fintech's data and AI governance: lineage to regulatory reports, data quality with
-filing gates, a catalog of owners and business terms, access and privacy controls, recertification campaigns, and an
-AI model inventory with fairness, drift and generative AI monitoring. Every action lands in a hash-chained audit log.
+filing gates, a catalog of owners and business terms, access and privacy controls, recertification campaigns, an
+AI model inventory with fairness, drift and generative AI monitoring, and coverage of every payment rail the
+business runs (ACH, wires, Fedwire, Swift, RTP, FedNow and SEPA Instant). Every action lands in a hash-chained audit log.
 
 | Tier | Technology |
 | --- | --- |
@@ -47,6 +48,25 @@ labels) is embedded into the `knowledge_vectors` table with an HNSW cosine index
   the nearest steward-confirmed columns. Suggestions are advisory; a steward confirms every label.
 
 The index is rebuilt after changes that affect it and can be rebuilt on demand with `POST /api/admin/reindex`.
+
+## Payment rails
+
+The Payment rails page shows each payment type with its operator, message standard, settlement, limits, the rules
+that apply and dated rule changes (in effect or upcoming). Each rail is tied to its critical data elements, the
+quality rules on them, open issues, the fraud and AML models that score it, and the Travel Rule recordkeeping lineage.
+
+| Rail | Example rules and checks in the demo data |
+| --- | --- |
+| ACH | Nacha 2026 fraud monitoring and PAYROLL / PURCHASE descriptions; SEC code validity; unauthorized returns against Nacha's 0.5% |
+| Wire transfers | Product that routes to Fedwire or Swift; Travel Rule data on transfers of $3,000 or more; UCC 4A |
+| Fedwire Funds | ISO 20022 since 14 Jul 2025; structured address quality |
+| Swift cross-border | CBPR+ after the end of MT coexistence; UETR on every payment; unstructured address retirement (deferred, date due by December 2026) |
+| RTP and FedNow | $10 million network limits; end-to-end ID uniqueness; real-time fraud scoring |
+| Instant Payment (SEPA Inst) | EU Instant Payments Regulation: Verification of Payee before authorisation, daily customer sanctions screening |
+
+Rail reference data lives in `backend/app/payments.py`. On start-up Aegis adds it to databases seeded by an older
+release and refreshes rules, limits and dated changes on existing ones without touching metrics. Rule-change dates
+were checked in October 2026; volumes and quality results are examples.
 
 ## Run it locally
 
@@ -138,6 +158,7 @@ Interactive docs are at `/docs`. Main routes:
 | Access and privacy | `GET /api/access/scans`, `POST /api/access/scans/{id}`, `POST /api/access/suggest-classification`, `GET /api/access/policies`, `POST /api/access/policies/{id}/toggle` |
 | Recertification | `GET /api/recert/campaigns`, `GET /api/recert/inbox`, `POST /api/recert/items/{id}/decision`, `POST /api/recert/campaigns/{id}/seal`, `GET /api/recert/tasks` |
 | AI governance | `GET /api/ai/models`, `GET /api/ai/models/{id}`, `POST /api/ai/models/{id}/fairness-test`, `.../mitigate`, `.../evaluate`, `.../approve`, `.../pause`, `.../revalidate` |
+| Payment rails | `GET /api/payments/rails`, `GET /api/payments/rails/{id}` |
 | Search | `GET /api/search`, `POST /api/ask`, `POST /api/admin/reindex` |
 
 ## What is simulated in this MVP

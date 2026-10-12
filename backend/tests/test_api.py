@@ -5,8 +5,8 @@ def test_health(client):
 def test_overview_kpis_and_attention(client):
     body = client.get("/api/overview").json()
     k = body["kpis"]
-    assert k["cdesTotal"] == 12 and k["cdesOwned"] == 11
-    assert k["models"] == 6
+    assert k["cdesTotal"] == 25 and k["cdesOwned"] == 24
+    assert k["models"] == 7
     titles = [a["title"] for a in body["attention"]]
     assert any("customer.date_of_birth has no owner" in t for t in titles)
     assert any("Card fraud scoring" in t for t in titles)  # drift and overdue validation
@@ -164,3 +164,61 @@ def test_database_url_built_from_parts():
 
     s = Settings(db_host="db.internal", db_user="aegis", db_password="p@ss/word")
     assert s.database_url == "postgresql+psycopg://aegis:p%40ss%2Fword@db.internal:5432/aegis?sslmode=require"
+
+
+def test_all_payment_rails_are_listed_in_order(client):
+    rails = client.get("/api/payments/rails").json()
+    assert [r["id"] for r in rails] == ["ach", "wire", "fedwire", "swift", "rtp", "fednow", "sepa_inst"]
+    wire = next(r for r in rails if r["id"] == "wire")
+    assert wire["routesTo"] == ["fedwire", "swift"]
+
+
+def test_ach_rail_shows_nacha_rule_breach_and_changes(client):
+    ach = client.get("/api/payments/rails/ach").json()
+    assert ach["quality"] == "breach"
+    assert any(r["id"] == "DQ-203" and r["status"] == "breach" for r in ach["rules"])
+    assert any("Nacha fraud monitoring phase 1" in c["text"] for c in ach["changes"])
+    assert any(i["id"] == "ISS-2050" for i in ach["issues"])
+    assert any(m["id"] == "M7" for m in ach["models"])
+
+
+def test_swift_rail_flags_repair_rate_and_links_travel_rule_report(client):
+    swift = client.get("/api/payments/rails/swift").json()
+    assert swift["rateOver"] is True
+    assert swift["report"]["id"] == "travel"
+    travel = client.get("/api/reports/travel").json()
+    assert travel["gate"]["held"] is True  # DQ-206 structured address breach
+    assert any(e["kind"] == "manual" for e in travel["edges"])
+
+
+def test_unknown_rail_is_404(client):
+    assert client.get("/api/payments/rails/cheque").status_code == 404
+
+
+def test_search_finds_rails(client):
+    res = client.get("/api/search", params={"q": "Verification of Payee euro instant"}).json()["results"]
+    assert any(r["kind"] == "rail" and r["refId"] == "sepa_inst" for r in res[:3])
+
+
+def test_payment_seed_is_idempotent(client):
+    from app.db import SessionLocal
+    from app.payments import seed_payments
+
+    with SessionLocal() as db:
+        assert seed_payments(db) is False
+
+
+def test_rail_reference_data_refreshes_on_older_databases(client):
+    from app.db import SessionLocal
+    from app.models import PaymentRail
+    from app.payments import seed_payments
+
+    with SessionLocal() as db:
+        swift = db.get(PaymentRail, "swift")
+        swift.changes = swift.changes[:1]  # as an older release would have stored it
+        db.commit()
+        assert seed_payments(db) is True
+        db.refresh(swift)
+        assert any("unstructured postal addresses" in c["text"] for c in swift.changes)
+    swift_api = client.get("/api/payments/rails/swift").json()
+    assert swift_api["changes"][0]["date"] == "2026-12"  # newest first

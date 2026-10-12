@@ -12,7 +12,7 @@ from ..vectorstore import get_store
 
 router = APIRouter(prefix="/api", tags=["search"])
 
-KINDS = ["dataset", "cde", "term", "policy", "model", "report"]
+KINDS = ["dataset", "cde", "term", "policy", "model", "report", "rail"]
 
 
 class AskIn(BaseModel):

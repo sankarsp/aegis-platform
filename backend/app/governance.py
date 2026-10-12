@@ -5,7 +5,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import AiModel, Asset, Cde, DqRule, GlossaryTerm, LineageEdge, Policy, Report, Scan
+from .models import AiModel, Asset, Cde, DqRule, GlossaryTerm, LineageEdge, PaymentRail, Policy, Report, Scan
 from .vectorstore import get_store
 
 FOUR_FIFTHS = 0.80
@@ -121,6 +121,47 @@ def index_scan(db: Session, s: Scan) -> None:
         get_store().upsert(db, "labelled_column", s.id, s.column_name, f"{s.column_name} labelled {s.label}", {"label": s.label})
 
 
+def rail_status(db: Session, r: PaymentRail) -> dict:
+    """Worst data-quality status across the rail's CDEs, plus whether its key rate is over threshold."""
+    statuses = [cde_status(db, c) for c in r.cde_ids]
+    worst = "breach" if "breach" in statuses else ("warn" if "warn" in statuses else "pass")
+    rate = r.metrics.get("returnRate") or {}
+    over = rate.get("value") is not None and rate["value"] > rate["threshold"]
+    alerts = []
+    for rule in db.scalars(select(DqRule).where(DqRule.cde_id.in_(r.cde_ids))):
+        s = rule_status(rule)
+        if s != "pass":
+            alerts.append(
+                {
+                    "level": "crit" if s == "breach" else "warn",
+                    "text": f"{rule.id}: {rule.name} ({rule.last_value}% vs {rule.threshold}%)",
+                }
+            )
+    if over:
+        alerts.append(
+            {
+                "level": "warn",
+                "text": f"{rate['label']} {rate['value']}{rate.get('unit', '')} above {rate['threshold']}{rate.get('unit', '')}",
+            }
+        )
+    upcoming = [c for c in r.changes if c["date"] >= today()[: len(c["date"])]]
+    return {"quality": worst, "rateOver": over, "alerts": alerts, "upcomingChanges": len(upcoming)}
+
+
+def index_rail(db: Session, r: PaymentRail) -> None:
+    regs = "; ".join(f"{x['name']}: {x['note']}" for x in r.regulations)
+    changes = "; ".join(f"{c['date']} {c['text']}" for c in r.changes)
+    get_store().upsert(
+        db,
+        "rail",
+        r.id,
+        f"{r.name} payments",
+        f"{r.category} payment rail operated by {r.operator}. {r.description} Messages: {r.message_standard}. "
+        f"Settlement: {r.settlement}. Limit: {r.txn_limit}. Rules: {regs}. Changes: {changes}.",
+        {"category": r.category},
+    )
+
+
 def index_report(db: Session, rp: Report) -> None:
     get_store().upsert(
         db, "report", rp.id, rp.name, f"Regulatory report for {rp.regulation}. Cadence {rp.cadence}. Owner {rp.owner}."
@@ -143,5 +184,7 @@ def reindex(db: Session) -> int:
         index_scan(db, s)
     for rp in db.scalars(select(Report)):
         index_report(db, rp)
+    for r in db.scalars(select(PaymentRail)):
+        index_rail(db, r)
     db.commit()
     return get_store().count(db)

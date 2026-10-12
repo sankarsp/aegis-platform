@@ -1,6 +1,6 @@
 import type {
   AiModel, AskResult, Asset, Campaign, Cde, EvidencePack, GateRow, Impact, Issue, Overview, Policy, ReportDetail,
-  ReportSummary, ReviewItem, Rule, Scan, SearchHit, SimilarTerm, Suggestion, Task, Term, AuditEvent,
+  ReportSummary, ReviewItem, Rule, Scan, SearchHit, SimilarTerm, Suggestion, Task, Term, AuditEvent, RailDetail, RailSummary,
 } from "./types";
 import { authHeader } from "./auth";
 
@@ -64,6 +64,9 @@ export const api = {
   models: () => call<AiModel[]>("/api/ai/models"),
   modelAction: (id: string, action: "fairness-test" | "mitigate" | "evaluate" | "approve" | "pause" | "revalidate") =>
     post<AiModel>(`/api/ai/models/${q(id)}/${action}`),
+
+  rails: () => call<RailSummary[]>("/api/payments/rails"),
+  rail: (id: string) => call<RailDetail>(`/api/payments/rails/${q(id)}`),
 
   audit: () => call<{ intact: boolean; firstBrokenId: number | null; events: AuditEvent[] }>("/api/audit"),
   search: (text: string) => call<{ query: string; results: SearchHit[] }>(`/api/search?q=${q(text)}`),
